@@ -64,3 +64,17 @@ class OrderFlowTests(APITestCase):
             'name': 'Sneaky', 'email': 'sneaky@test.demo', 'password': 'testpass123', 'role': 'admin',
         })
         self.assertEqual(res.status_code, 400)
+
+    def test_profile_update_persists_but_cannot_change_role(self):
+        user = User.objects.create_user(email='profile@test.demo', password='x', role='customer')
+        self.client.force_authenticate(user=user)
+
+        res = self.client.patch('/api/auth/me/', {'name': 'Updated Name', 'phone': '9876543210'}, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['name'], 'Updated Name')
+        self.assertEqual(res.data['phone'], '9876543210')
+
+        escalate_res = self.client.patch('/api/auth/me/', {'role': 'admin'}, format='json')
+        self.assertEqual(escalate_res.status_code, 200)
+        user.refresh_from_db()
+        self.assertEqual(user.role, 'customer')

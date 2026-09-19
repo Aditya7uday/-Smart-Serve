@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/Toast';
+import { authService } from '../../services/authService';
 import { FormInput } from '../../components/FormInput';
 import { UserCircle, Key, Loader2, CheckCircle2, Link } from 'lucide-react';
 
@@ -9,7 +10,7 @@ export function Profile() {
   const { addToast } = useToast();
   const user = authState.user;
 
-  const [profileData, setProfileData] = useState({ name: user?.name || '', email: user?.email || '', phone: '' });
+  const [profileData, setProfileData] = useState({ name: user?.name || '', phone: user?.phone || '' });
   const [profileLoading, setProfileLoading] = useState(false);
 
   const [pwData, setPwData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -19,10 +20,15 @@ export function Profile() {
   const handleProfileSave = async (e) => {
     e.preventDefault();
     setProfileLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    dispatch({ type: 'LOGIN', payload: { ...user, name: profileData.name, email: profileData.email } });
-    addToast('Profile updated successfully!', 'success');
-    setProfileLoading(false);
+    try {
+      const updated = await authService.updateProfile({ name: profileData.name, phone: profileData.phone });
+      dispatch({ type: 'LOGIN', payload: { ...user, ...updated } });
+      addToast('Profile updated successfully!', 'success');
+    } catch (err) {
+      addToast(err.message || 'Failed to update profile', 'error');
+    } finally {
+      setProfileLoading(false);
+    }
   };
 
   const handlePasswordChange = async (e) => {
@@ -59,8 +65,8 @@ export function Profile() {
 
         <form onSubmit={handleProfileSave} className="space-y-4">
           <FormInput label="Full Name" id="profile-name" value={profileData.name} onChange={e => setProfileData(p => ({ ...p, name: e.target.value }))} required />
-          <FormInput label="Email Address" id="profile-email" type="email" value={profileData.email} onChange={e => setProfileData(p => ({ ...p, email: e.target.value }))} required />
-          <FormInput label="Phone (Optional)" id="profile-phone" type="tel" value={profileData.phone} onChange={e => setProfileData(p => ({ ...p, phone: e.target.value }))} />
+          <FormInput label="Email Address" id="profile-email" type="email" value={user?.email || ''} disabled />
+          <FormInput label="Phone" id="profile-phone" type="tel" value={profileData.phone} onChange={e => setProfileData(p => ({ ...p, phone: e.target.value }))} placeholder="Used to prefill payments" />
           <button type="submit" disabled={profileLoading} className="w-full py-3 bg-primary-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-colors disabled:opacity-70 flex items-center justify-center gap-2">
             {profileLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Changes'}
           </button>

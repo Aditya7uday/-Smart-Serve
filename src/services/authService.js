@@ -31,5 +31,7 @@ export const authService = {
 
   me: async () => apiRequest('/auth/me/'),
 
+  updateProfile: async (updates) => apiRequest('/auth/me/', { method: 'PATCH', body: updates }),
+
   logout: () => tokenStore.clear(),
 };
