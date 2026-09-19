@@ -1,9 +1,11 @@
+import razorpay
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import F, Sum
 from django.utils import timezone
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,6 +20,34 @@ from .serializers import (
 )
 
 User = get_user_model()
+
+
+def get_razorpay_client():
+    return razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+
+
+class CreateRazorpayOrderView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            amount = float(request.data.get('amount'))
+        except (TypeError, ValueError):
+            return Response({'detail': 'A valid amount is required'}, status=400)
+        if amount <= 0:
+            return Response({'detail': 'Amount must be greater than zero'}, status=400)
+
+        order = get_razorpay_client().order.create({
+            'amount': int(round(amount * 100)),
+            'currency': 'INR',
+            'payment_capture': 1,
+        })
+        return Response({
+            'orderId': order['id'],
+            'amount': order['amount'],
+            'currency': order['currency'],
+            'key': settings.RAZORPAY_KEY_ID,
+        })
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -135,7 +165,36 @@ class OrderViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(customer=self.request.user)
+        razorpay_order_id = self.request.data.get('razorpayOrderId')
+        if not razorpay_order_id:
+            serializer.save(customer=self.request.user)
+            return
+
+        razorpay_payment_id = self.request.data.get('razorpayPaymentId')
+        razorpay_signature = self.request.data.get('razorpaySignature')
+        client = get_razorpay_client()
+
+        try:
+            client.utility.verify_payment_signature({
+                'razorpay_order_id': razorpay_order_id,
+                'razorpay_payment_id': razorpay_payment_id,
+                'razorpay_signature': razorpay_signature,
+            })
+        except razorpay.errors.SignatureVerificationError:
+            raise ValidationError('Payment verification failed.')
+
+        # Cross-check the amount actually paid against the order total being
+        # created, so a tampered `total` can't slip past a valid signature.
+        paid_order = client.order.fetch(razorpay_order_id)
+        expected_paise = int(round(float(serializer.validated_data['total']) * 100))
+        if paid_order['amount'] != expected_paise or paid_order['status'] != 'paid':
+            raise ValidationError('Paid amount does not match the order total.')
+
+        serializer.save(
+            customer=self.request.user,
+            razorpay_order_id=razorpay_order_id,
+            razorpay_payment_id=razorpay_payment_id,
+        )
 
     def perform_update(self, serializer):
         user = self.request.user
