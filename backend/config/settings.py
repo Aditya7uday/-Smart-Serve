@@ -2,17 +2,33 @@
 Django settings for config project.
 """
 
+import os
 from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
-from decouple import Csv, config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY')
-DEBUG = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+# Local dev convenience: load backend/.env into the process environment.
+# Real env vars (Vercel, etc.) always win — this only fills in what's missing.
+_dotenv = BASE_DIR / '.env'
+if _dotenv.exists():
+    for line in _dotenv.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, _, value = line.partition('=')
+        os.environ.setdefault(key.strip(), value.strip())
+
+
+def env_csv(name, default=''):
+    return [v.strip() for v in os.environ.get(name, default).split(',') if v.strip()]
+
+
+SECRET_KEY = os.environ['SECRET_KEY']
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+ALLOWED_HOSTS = env_csv('ALLOWED_HOSTS', 'localhost,127.0.0.1')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -57,7 +73,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
-    'default': dj_database_url.config(default=config('DATABASE_URL'), conn_max_age=0)
+    'default': dj_database_url.config(default=os.environ['DATABASE_URL'], conn_max_age=0)
 }
 
 AUTH_USER_MODEL = 'core.User'
@@ -92,4 +108,4 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='', cast=Csv())
+CORS_ALLOWED_ORIGINS = env_csv('CORS_ALLOWED_ORIGINS')
