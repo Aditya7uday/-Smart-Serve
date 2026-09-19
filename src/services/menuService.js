@@ -14,6 +14,10 @@ export const menuService = {
     return apiRequest('/categories/');
   },
 
+  addCategory: async (categoryData) => {
+    return apiRequest('/categories/', { method: 'POST', body: categoryData });
+  },
+
   getMenuItems: async ({ categoryId, search, isVeg, sortBy } = {}) => {
     return apiRequest(`/menu-items/${buildQuery({ categoryId, search, isVeg, sortBy })}`);
   },

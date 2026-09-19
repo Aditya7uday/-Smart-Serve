@@ -10,6 +10,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { Plus, Pencil, Trash2, Search, ToggleLeft, ToggleRight } from 'lucide-react';
 
 const emptyItem = { name: '', price: '', categoryId: '', description: '', image: '', isVeg: true, available: true };
+const NEW_CATEGORY_VALUE = '__new__';
 
 export function AdminMenu() {
   const [items, setItems] = useState([]);
@@ -20,6 +21,8 @@ export function AdminMenu() {
   const [editItem, setEditItem] = useState(null);
   const [formData, setFormData] = useState(emptyItem);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryIcon, setNewCategoryIcon] = useState('');
   const { addToast } = useToast();
 
   useEffect(() => {
@@ -29,24 +32,36 @@ export function AdminMenu() {
 
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
 
-  const openAdd = () => { setEditItem(null); setFormData(emptyItem); setModalOpen(true); };
-  const openEdit = (item) => { setEditItem(item); setFormData({ ...item, price: String(item.price) }); setModalOpen(true); };
+  const openAdd = () => { setEditItem(null); setFormData(emptyItem); setNewCategoryName(''); setNewCategoryIcon(''); setModalOpen(true); };
+  const openEdit = (item) => { setEditItem(item); setFormData({ ...item, price: String(item.price) }); setNewCategoryName(''); setNewCategoryIcon(''); setModalOpen(true); };
 
   const handleSave = async (e) => {
     e.preventDefault();
     try {
+      let categoryId = formData.categoryId;
+      if (categoryId === NEW_CATEGORY_VALUE) {
+        if (!newCategoryName.trim()) {
+          addToast('Enter a name for the new category', 'error');
+          return;
+        }
+        const newCat = await menuService.addCategory({ name: newCategoryName.trim(), icon: newCategoryIcon.trim() });
+        setCats(prev => [...prev, newCat]);
+        categoryId = newCat.id;
+      }
+
+      const payload = { ...formData, categoryId, price: Number(formData.price) };
       if (editItem) {
-        const updated = await menuService.updateMenuItem(editItem.id, { ...formData, price: Number(formData.price) });
+        const updated = await menuService.updateMenuItem(editItem.id, payload);
         setItems(prev => prev.map(i => i.id === editItem.id ? updated : i));
         addToast('Item updated!', 'success');
       } else {
-        const newItem = await menuService.addMenuItem({ ...formData, price: Number(formData.price) });
+        const newItem = await menuService.addMenuItem(payload);
         setItems(prev => [newItem, ...prev]);
         addToast('Item added!', 'success');
       }
       setModalOpen(false);
-    } catch {
-      addToast('Failed to save item', 'error');
+    } catch (err) {
+      addToast(err.message || 'Failed to save item', 'error');
     }
   };
 
@@ -150,9 +165,16 @@ export function AdminMenu() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-orange bg-white text-sm">
                 <option value="">Select category</option>
                 {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value={NEW_CATEGORY_VALUE}>+ Other (add new category)</option>
               </select>
             </div>
           </div>
+          {formData.categoryId === NEW_CATEGORY_VALUE && (
+            <div className="grid grid-cols-[1fr_auto] gap-3 -mt-2 p-3 bg-orange-50 border border-orange-100 rounded-lg">
+              <FormInput label="New Category Name" id="new-category-name" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="e.g. Wraps" required />
+              <FormInput label="Icon" id="new-category-icon" value={newCategoryIcon} onChange={e => setNewCategoryIcon(e.target.value)} placeholder="🌯" />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-dark-text mb-1">Description</label>
             <textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
