@@ -5,9 +5,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useOrders } from '../../context/OrderContext';
 import { useToast } from '../../components/Toast';
 import { orderService } from '../../services/menuService';
+import { paymentService } from '../../services/paymentService';
 import { FormInput } from '../../components/FormInput';
 import { EmptyState } from '../../components/EmptyState';
-import { ShoppingCart, MapPin, CreditCard, CheckCircle2, Loader2, ChevronRight } from 'lucide-react';
+import { ShoppingCart, CheckCircle2, Loader2, ChevronRight } from 'lucide-react';
 
 const STEPS = ['Review Order', 'Your Details', 'Order Type', 'Payment', 'Confirmation'];
 
@@ -20,8 +21,8 @@ export function Checkout() {
 
   const [step, setStep] = useState(0);
   const [orderType, setOrderType] = useState('pickup');
-  const [paymentMethod, setPaymentMethod] = useState('upi');
-  const [paymentResult, setPaymentResult] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('razorpay');
+  const [paymentError, setPaymentError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
   const [details, setDetails] = useState({ name: authState.user?.name || '', phone: '', address: '' });
@@ -49,35 +50,71 @@ export function Checkout() {
     return Object.keys(errs).length === 0;
   };
 
-  const handlePayment = async (simulatedResult) => {
-    setIsProcessing(true);
-    // Simulate payment network delay
-    await new Promise(r => setTimeout(r, 1500));
-    setPaymentResult(simulatedResult);
-
-    if (simulatedResult === 'success') {
-      try {
-        const order = await orderService.createOrder({
-          customerId: authState.user?.id,
-          customerName: authState.user?.name,
-          items: cartState.items,
-          total,
-          type: orderType,
-          paymentMethod,
-          status: 'Placed',
-        });
-        setCreatedOrder(order);
-        orderDispatch({ type: 'ADD_ORDER', payload: order });
-        cartDispatch({ type: 'CLEAR_CART' });
-        addToast('Order placed successfully! 🎉', 'success');
-        setStep(4);
-      } catch (err) {
-        addToast('Failed to create order. Please retry.', 'error');
-      }
-    } else {
-      addToast('Payment failed. Please try again.', 'error');
+  const finalizeOrder = async (extraFields) => {
+    try {
+      const order = await orderService.createOrder({
+        customerId: authState.user?.id,
+        customerName: authState.user?.name,
+        items: cartState.items,
+        total,
+        type: orderType,
+        status: 'Placed',
+        ...extraFields,
+      });
+      setCreatedOrder(order);
+      orderDispatch({ type: 'ADD_ORDER', payload: order });
+      cartDispatch({ type: 'CLEAR_CART' });
+      addToast('Order placed successfully! 🎉', 'success');
+      setStep(4);
+    } catch (err) {
+      addToast(err.message || 'Failed to create order. Please retry.', 'error');
+    } finally {
+      setIsProcessing(false);
     }
-    setIsProcessing(false);
+  };
+
+  const handlePayment = async () => {
+    setPaymentError('');
+    setIsProcessing(true);
+
+    if (paymentMethod === 'cash') {
+      await finalizeOrder({ paymentMethod: 'Cash' });
+      return;
+    }
+
+    try {
+      const rpOrder = await paymentService.createRazorpayOrder(total);
+      const rzp = new window.Razorpay({
+        key: rpOrder.key,
+        amount: rpOrder.amount,
+        currency: rpOrder.currency,
+        order_id: rpOrder.orderId,
+        name: 'Smart Serve',
+        description: 'Canteen order payment',
+        prefill: { name: details.name, contact: details.phone, email: authState.user?.email },
+        theme: { color: '#FF7A00' },
+        handler: (response) => finalizeOrder({
+          paymentMethod: 'Razorpay',
+          razorpayOrderId: response.razorpay_order_id,
+          razorpayPaymentId: response.razorpay_payment_id,
+          razorpaySignature: response.razorpay_signature,
+        }),
+        modal: {
+          ondismiss: () => {
+            setIsProcessing(false);
+            setPaymentError('Payment cancelled.');
+          },
+        },
+      });
+      rzp.on('payment.failed', () => {
+        setIsProcessing(false);
+        setPaymentError('Payment failed. Please try again.');
+      });
+      rzp.open();
+    } catch (err) {
+      setIsProcessing(false);
+      setPaymentError(err.message || 'Could not start payment. Please retry.');
+    }
   };
 
   const stepClasses = (i) =>
@@ -173,13 +210,12 @@ export function Checkout() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="font-bold text-xl text-dark-text mb-2">Payment</h2>
           <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2 rounded-lg mb-5">
-            ⚠️ This is a frontend simulation. No real payment is processed.
+            🧪 Razorpay Test Mode — use test cards/UPI, no real money is charged.
           </div>
           <div className="space-y-3 mb-6">
             {[
-              { id: 'upi', label: 'UPI / QR Code', icon: '📱' },
+              { id: 'razorpay', label: 'UPI / Card / Netbanking', icon: '💳' },
               { id: 'cash', label: 'Cash at Canteen', icon: '💵' },
-              { id: 'demo', label: 'Demo Pay (Instant)', icon: '⚡' },
             ].map(method => (
               <label key={method.id} className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${paymentMethod === method.id ? 'border-primary-orange bg-orange-50' : 'border-gray-200 hover:border-gray-300'}`}>
                 <input type="radio" name="paymentMethod" value={method.id} checked={paymentMethod === method.id} onChange={() => setPaymentMethod(method.id)} className="sr-only" />
@@ -190,18 +226,15 @@ export function Checkout() {
             ))}
           </div>
           <p className="text-lg font-bold text-dark-text mb-4">Total to pay: ₹{total}</p>
-          {paymentResult === 'fail' && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">Payment failed. Please try again or choose a different method.</div>
+          {paymentError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">{paymentError}</div>
           )}
           <div className="flex gap-3">
             <button onClick={() => setStep(2)} className="flex-1 py-3 border border-gray-200 text-secondary-gray rounded-xl font-semibold hover:bg-gray-50" disabled={isProcessing}>Back</button>
-            <button onClick={() => handlePayment('success')} disabled={isProcessing} className="flex-1 py-3 bg-primary-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-colors disabled:opacity-70 flex items-center justify-center gap-2">
-              {isProcessing ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</> : 'Pay Now'}
+            <button onClick={handlePayment} disabled={isProcessing} className="flex-1 py-3 bg-primary-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-colors disabled:opacity-70 flex items-center justify-center gap-2">
+              {isProcessing ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</> : paymentMethod === 'cash' ? 'Place Order' : 'Pay Now'}
             </button>
           </div>
-          {!isProcessing && (
-            <button onClick={() => handlePayment('fail')} className="w-full mt-2 text-xs text-secondary-gray hover:text-red-500 underline">Simulate Payment Failure</button>
-          )}
         </div>
       )}
 

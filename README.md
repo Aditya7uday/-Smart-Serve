@@ -51,7 +51,7 @@ python -m venv venv
 venv\Scripts\activate        # Windows (use `source venv/bin/activate` on macOS/Linux)
 pip install -r requirements.txt
 ```
-Copy `backend/.env.example` to `backend/.env` and fill in `SECRET_KEY` and `DATABASE_URL` (a Neon Postgres connection string). Then:
+Copy `backend/.env.example` to `backend/.env` and fill in `SECRET_KEY`, `DATABASE_URL` (a Neon Postgres connection string), and `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` (from your [Razorpay dashboard](https://dashboard.razorpay.com/app/keys) — test mode keys work fine for local dev; the online-payment option at checkout needs these set). Then:
 ```bash
 python manage.py migrate
 python manage.py seed_data   # loads demo categories/menu/users/orders

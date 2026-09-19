@@ -104,6 +104,8 @@ class Order(models.Model):
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='Placed')
     payment_method = models.CharField(max_length=30, default='Cash')
+    razorpay_order_id = models.CharField(max_length=100, blank=True)
+    razorpay_payment_id = models.CharField(max_length=100, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     delivery_staff = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name='deliveries'

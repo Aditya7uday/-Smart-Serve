@@ -19,5 +19,6 @@ urlpatterns = [
     path('auth/me/', views.MeView.as_view(), name='me'),
     path('users/', views.UserListView.as_view(), name='users'),
     path('admin/stats/', views.AdminStatsView.as_view(), name='admin_stats'),
+    path('payments/create-order/', views.CreateRazorpayOrderView.as_view(), name='create_razorpay_order'),
     *router.urls,
 ]
