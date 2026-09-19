@@ -27,6 +27,7 @@ export function AdminOrders() {
       adminService.getUsers()
     ]).then(([ords, usrs]) => {
       setOrders(ords);
+      orderDispatch({ type: 'SET_ORDERS', payload: ords });
       setDeliveryStaff(usrs.filter(u => u.role === 'delivery'));
       setLoading(false);
     });
@@ -59,18 +60,14 @@ export function AdminOrders() {
   const handleAssignDelivery = async (orderId, staffId) => {
     const o = allOrders.find(o => o.id === orderId);
     if (!o) return;
-    o.deliveryStaffId = staffId;
-    
-    // Also save this change to our new DB persistent layer!
-    await orderService.updateOrderStatus(orderId, o.status); // Hack to trigger save, or wait, I should update the deliveryStaffId too.
-    
-    // Let's manually trigger a DB save for this since we didn't add an assign method
-    // Wait, orderService.updateOrderStatus only updates status. I should let the backend (mock db) update deliveryStaffId.
-    // For now we'll just push to orderDispatch. The user won't notice if it doesn't persist across refresh if they just assigned it.
-    
-    orderDispatch({ type: 'UPDATE_ORDER_STATUS', payload: { id: orderId, status: o.status, deliveryStaffId: staffId } });
-    addToast(`Delivery staff assigned`, 'success');
-    if (selectedOrder?.id === orderId) setSelectedOrder(p => ({ ...p, deliveryStaffId: staffId }));
+    try {
+      await orderService.assignDeliveryStaff(orderId, staffId);
+      orderDispatch({ type: 'UPDATE_ORDER_STATUS', payload: { id: orderId, status: o.status, deliveryStaffId: staffId } });
+      addToast(`Delivery staff assigned`, 'success');
+      if (selectedOrder?.id === orderId) setSelectedOrder(p => ({ ...p, deliveryStaffId: staffId }));
+    } catch {
+      addToast('Failed to assign delivery staff', 'error');
+    }
   };
 
   if (loading) return <LoadingState message="Loading orders..." />;

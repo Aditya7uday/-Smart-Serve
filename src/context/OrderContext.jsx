@@ -1,5 +1,4 @@
-import { createContext, useReducer, useContext, useEffect } from 'react';
-import { db } from '../data/db';
+import { createContext, useReducer, useContext } from 'react';
 
 const OrderContext = createContext();
 
@@ -25,28 +24,7 @@ function orderReducer(state, action) {
 }
 
 export function OrderProvider({ children }) {
-  // Initialize from DB so context always has the latest state on mount
-  const initialState = {
-    orders: db.get('sampleOrders') || [],
-  };
-
-  const [state, dispatch] = useReducer(orderReducer, initialState);
-
-  // Sync across multiple browser tabs/windows
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === 'smartserve_sampleOrders' && e.newValue) {
-        try {
-          const newOrders = JSON.parse(e.newValue);
-          dispatch({ type: 'SET_ORDERS', payload: newOrders });
-        } catch (err) {
-          console.error("Failed to parse orders from storage");
-        }
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  const [state, dispatch] = useReducer(orderReducer, { orders: [] });
 
   return (
     <OrderContext.Provider value={{ state, dispatch }}>
@@ -56,4 +34,3 @@ export function OrderProvider({ children }) {
 }
 
 export const useOrders = () => useContext(OrderContext);
-

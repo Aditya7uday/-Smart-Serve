@@ -37,6 +37,7 @@ export function DeliveryDashboard() {
   useEffect(() => {
     deliveryService.getAllDeliveryOrders(authState.user?.id).then(data => {
       setOrders(data);
+      orderDispatch({ type: 'SET_ORDERS', payload: data });
       setLoading(false);
     });
   }, [authState.user?.id]);

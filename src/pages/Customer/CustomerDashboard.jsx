@@ -13,7 +13,7 @@ import { ShoppingBag, Clock, Star, ArrowRight, Search } from 'lucide-react';
 export function CustomerDashboard() {
   const { state: authState } = useAuth();
   const { state: cartState } = useCart();
-  const { state: orderState } = useOrders();
+  const { state: orderState, dispatch: orderDispatch } = useOrders();
   const [categories, setCategories] = useState([]);
   const [popularItems, setPopularItems] = useState([]);
   const [myOrders, setMyOrders] = useState([]);
@@ -31,6 +31,7 @@ export function CustomerDashboard() {
       setCategories(cats);
       setPopularItems(items.slice(0, 4));
       setMyOrders(orders);
+      orderDispatch({ type: 'SET_ORDERS', payload: orders });
       setLoading(false);
     }
     load();

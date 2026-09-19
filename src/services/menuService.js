@@ -1,119 +1,71 @@
-import { db } from '../data/db';
+import { apiRequest } from './apiClient';
 
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+function buildQuery(params = {}) {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') search.set(key, value);
+  });
+  const qs = search.toString();
+  return qs ? `?${qs}` : '';
+}
 
 export const menuService = {
   getCategories: async () => {
-    await delay(300);
-    return db.get('categories');
+    return apiRequest('/categories/');
   },
 
   getMenuItems: async ({ categoryId, search, isVeg, sortBy } = {}) => {
-    await delay(400);
-    let items = db.get('menuItems');
-    if (categoryId) items = items.filter(i => i.categoryId === categoryId);
-    if (search) items = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
-    if (isVeg === true) items = items.filter(i => i.isVeg);
-    if (sortBy === 'price_asc') items.sort((a, b) => a.price - b.price);
-    if (sortBy === 'price_desc') items.sort((a, b) => b.price - a.price);
-    if (sortBy === 'rating') items.sort((a, b) => b.rating - a.rating);
-    return items;
+    return apiRequest(`/menu-items/${buildQuery({ categoryId, search, isVeg, sortBy })}`);
   },
 
   getMenuItemById: async (id) => {
-    await delay(200);
-    const item = db.get('menuItems').find(i => i.id === id);
-    if (!item) throw new Error('Item not found');
-    return item;
+    return apiRequest(`/menu-items/${id}/`);
   },
 
-  // Admin CRUD operations
   addMenuItem: async (itemData) => {
-    await delay(300);
-    const items = db.get('menuItems');
-    const newItem = { id: `m${Date.now()}`, ...itemData, rating: 0, reviews: 0, customizations: [] };
-    items.unshift(newItem);
-    db.set('menuItems', items);
-    return newItem;
+    return apiRequest('/menu-items/', { method: 'POST', body: itemData });
   },
 
   updateMenuItem: async (id, updates) => {
-    await delay(300);
-    const items = db.get('menuItems');
-    const idx = items.findIndex(i => i.id === id);
-    if (idx === -1) throw new Error('Item not found');
-    const updatedItem = { ...items[idx], ...updates };
-    items[idx] = updatedItem;
-    db.set('menuItems', items);
-    return updatedItem;
+    return apiRequest(`/menu-items/${id}/`, { method: 'PATCH', body: updates });
   },
 
   deleteMenuItem: async (id) => {
-    await delay(300);
-    const items = db.get('menuItems');
-    const newItems = items.filter(i => i.id !== id);
-    db.set('menuItems', newItems);
+    await apiRequest(`/menu-items/${id}/`, { method: 'DELETE' });
     return true;
   },
 
   toggleAvailability: async (id) => {
-    await delay(200);
-    const items = db.get('menuItems');
-    const idx = items.findIndex(i => i.id === id);
-    if (idx === -1) throw new Error('Item not found');
-    items[idx].available = !items[idx].available;
-    db.set('menuItems', items);
-    return items[idx];
+    return apiRequest(`/menu-items/${id}/toggle_availability/`, { method: 'PATCH' });
   },
 
   getReviewsForItem: async (itemId) => {
-    await delay(300);
-    return db.get('reviews').filter(r => r.itemId === itemId);
-  }
+    return apiRequest(`/menu-items/${itemId}/reviews/`);
+  },
 };
 
 export const orderService = {
-  getOrdersForUser: async (userId) => {
-    await delay(500);
-    return db.get('sampleOrders').filter(o => o.customerId === userId);
+  getOrdersForUser: async () => {
+    return apiRequest('/orders/');
   },
 
   getAllOrders: async () => {
-    await delay(500);
-    return db.get('sampleOrders');
+    return apiRequest('/orders/');
   },
 
   createOrder: async (orderData) => {
-    await delay(1000);
-    const orders = db.get('sampleOrders');
-    const newOrder = {
-      id: `ORD-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      status: 'Placed',
-      deliveryStaffId: null,
-      ...orderData
-    };
-    orders.unshift(newOrder);
-    db.set('sampleOrders', orders);
-    return newOrder;
+    return apiRequest('/orders/', { method: 'POST', body: orderData });
   },
 
   updateOrderStatus: async (orderId, status) => {
-    await delay(400);
-    const orders = db.get('sampleOrders');
-    const order = orders.find(o => o.id === orderId);
-    if (!order) throw new Error('Order not found');
-    order.status = status;
-    db.set('sampleOrders', orders);
-    return order;
+    return apiRequest(`/orders/${orderId}/`, { method: 'PATCH', body: { status } });
+  },
+
+  assignDeliveryStaff: async (orderId, staffId) => {
+    return apiRequest(`/orders/${orderId}/`, { method: 'PATCH', body: { deliveryStaffId: staffId } });
   },
 
   submitReview: async (reviewData) => {
-    await delay(500);
-    const reviews = db.get('reviews');
-    const newReview = { id: `r${Date.now()}`, date: new Date().toISOString(), ...reviewData };
-    reviews.push(newReview);
-    db.set('reviews', reviews);
-    return newReview;
-  }
+    return apiRequest('/reviews/', { method: 'POST', body: reviewData });
+  },
 };

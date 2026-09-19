@@ -14,7 +14,7 @@ const FILTERS = ['All', 'Active', 'Completed', 'Cancelled'];
 
 export function MyOrders() {
   const { state: authState } = useAuth();
-  const { state: orderState } = useOrders();
+  const { state: orderState, dispatch: orderDispatch } = useOrders();
   const { dispatch: cartDispatch } = useCart();
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -25,6 +25,7 @@ export function MyOrders() {
   useEffect(() => {
     orderService.getOrdersForUser(authState.user?.id).then(data => {
       setOrders(data);
+      orderDispatch({ type: 'SET_ORDERS', payload: data });
       setLoading(false);
     });
   }, [authState.user?.id]);

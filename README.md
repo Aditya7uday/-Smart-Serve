@@ -2,7 +2,7 @@
 
 **Smart Serve** is a modern, centralized College Canteen Management System and Online Food Ordering Platform. It connects students, canteen management, and a peer-to-peer student delivery network into a single, cohesive ecosystem.
 
-This project is built as a complete frontend prototype for an MCA Mini-Project, featuring a premium UI/UX, responsive design, and a simulated mock backend that uses `localStorage` for cross-tab live synchronization.
+This project is built as a full-stack MCA Mini-Project, featuring a premium UI/UX, responsive design, a Django REST API backend, and a Postgres database (Neon).
 
 ---
 
@@ -32,53 +32,55 @@ This project is built as a complete frontend prototype for an MCA Mini-Project, 
 ---
 
 ## 🛠 Tech Stack
-- **Framework:** React 18 + Vite
-- **Routing:** React Router v6
-- **Styling:** Tailwind CSS v4
-- **Icons:** Lucide React
+- **Frontend:** React 18 + Vite, React Router v6, Tailwind CSS v4, Lucide React
 - **State Management:** React Context API + `useReducer`
-- **Database (Mock):** Browser `localStorage` (Simulates a real DB with cross-tab live syncing!)
+- **Backend:** Django + Django REST Framework, JWT auth (`djangorestframework-simplejwt`)
+- **Database:** PostgreSQL (Neon)
 
 ---
 
 ## 🚀 How to Run Locally
 
 ### Prerequisites
-Make sure you have [Node.js](https://nodejs.org/) installed on your machine.
+[Node.js](https://nodejs.org/) and Python 3.12+.
 
-### Installation
-1. Clone the repository or extract the project folder.
-2. Open your terminal and navigate to the project directory:
-   ```bash
-   cd Smart-Serve
-   ```
-3. Install the dependencies:
-   ```bash
-   npm install
-   ```
-4. Start the Vite development server:
-   ```bash
-   npm run dev
-   ```
-5. Open your browser and go to `http://localhost:5173`
+### 1. Backend (Django API)
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate        # Windows (use `source venv/bin/activate` on macOS/Linux)
+pip install -r requirements.txt
+```
+Copy `backend/.env.example` to `backend/.env` and fill in `SECRET_KEY` and `DATABASE_URL` (a Neon Postgres connection string). Then:
+```bash
+python manage.py migrate
+python manage.py seed_data   # loads demo categories/menu/users/orders
+python manage.py runserver 8000
+```
+
+### 2. Frontend (React)
+From the repo root:
+```bash
+npm install
+npm run dev
+```
+Copy `.env.example` to `.env.local` if your API isn't running on the default `http://localhost:8000/api`.
+
+Open `http://localhost:5173`.
 
 ---
 
 ## 🔑 How to Test (Demo Credentials)
 
-The login page features a **Demo Accounts** panel where you can instantly log into any role without typing. If you prefer to type manually:
+`seed_data` creates these accounts (password `password` for all):
 
-| Role | Email | Password |
-| :--- | :--- | :--- |
-| **Customer** | `student@college.edu` | `password123` |
-| **Admin** | `admin@college.edu` | `admin123` |
-| **Delivery** | `delivery@college.edu` | `delivery123` |
+| Role | Email |
+| :--- | :--- |
+| **Customer** | `customer@smartserve.demo` |
+| **Admin** | `admin@smartserve.demo` |
+| **Delivery** | `delivery@smartserve.demo` |
 
-### 💡 Pro-Tip for Presentation / Testing
-To see the **Live Sync** functionality (simulating WebSockets), open **two separate windows of the SAME browser** (e.g., two Chrome windows). 
-- Log in as a **Customer** in Window 1 and place an order.
-- Log in as an **Admin** in Window 2.
-- Update the order status in Window 2, and watch it instantly update in Window 1!
+The login page also has a **Demo Accounts** panel to fill these in automatically.
 
 ---
 
