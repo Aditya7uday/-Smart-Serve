@@ -53,6 +53,10 @@ export const orderService = {
     return apiRequest('/orders/');
   },
 
+  getOrder: async (orderId) => {
+    return apiRequest(`/orders/${orderId}/`);
+  },
+
   createOrder: async (orderData) => {
     return apiRequest('/orders/', { method: 'POST', body: orderData });
   },
