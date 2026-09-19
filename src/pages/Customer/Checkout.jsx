@@ -8,7 +8,7 @@ import { orderService } from '../../services/menuService';
 import { paymentService } from '../../services/paymentService';
 import { FormInput } from '../../components/FormInput';
 import { EmptyState } from '../../components/EmptyState';
-import { ShoppingCart, CheckCircle2, Loader2, ChevronRight } from 'lucide-react';
+import { ShoppingCart, CheckCircle2, Loader2, ChevronRight, CreditCard, Wallet, ShieldCheck } from 'lucide-react';
 
 const STEPS = ['Review Order', 'Your Details', 'Order Type', 'Payment', 'Confirmation'];
 
@@ -25,7 +25,7 @@ export function Checkout() {
   const [paymentError, setPaymentError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
-  const [details, setDetails] = useState({ name: authState.user?.name || '', phone: '', address: '' });
+  const [details, setDetails] = useState({ name: authState.user?.name || '', phone: authState.user?.phone || '', address: '' });
   const [detailsErrors, setDetailsErrors] = useState({});
 
   const DELIVERY_FEE = 20;
@@ -84,6 +84,8 @@ export function Checkout() {
 
     try {
       const rpOrder = await paymentService.createRazorpayOrder(total);
+      const digits = details.phone.replace(/\D/g, '');
+      const contact = digits ? `+91${digits.slice(-10)}` : '';
       const rzp = new window.Razorpay({
         key: rpOrder.key,
         amount: rpOrder.amount,
@@ -91,7 +93,8 @@ export function Checkout() {
         order_id: rpOrder.orderId,
         name: 'Smart Serve',
         description: 'Canteen order payment',
-        prefill: { name: details.name, contact: details.phone, email: authState.user?.email },
+        image: `${window.location.origin}/favicon.svg`,
+        prefill: { name: details.name, contact, email: authState.user?.email },
         theme: { color: '#FF7A00' },
         handler: (response) => finalizeOrder({
           paymentMethod: 'Razorpay',
@@ -207,33 +210,56 @@ export function Checkout() {
 
       {/* Step 3: Payment */}
       {step === 3 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="font-bold text-xl text-dark-text mb-2">Payment</h2>
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2 rounded-lg mb-5">
-            🧪 Razorpay Test Mode — use test cards/UPI, no real money is charged.
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-br from-primary-orange to-orange-600 px-6 py-6 text-white">
+            <p className="text-sm font-medium text-orange-100">Amount to pay</p>
+            <p className="text-4xl font-extrabold tracking-tight mt-1">₹{total}</p>
+            <div className="inline-flex items-center gap-1.5 mt-3 bg-white/15 border border-white/25 text-xs font-semibold px-3 py-1 rounded-full">
+              🧪 Razorpay Test Mode — no real money is charged
+            </div>
           </div>
-          <div className="space-y-3 mb-6">
-            {[
-              { id: 'razorpay', label: 'UPI / Card / Netbanking', icon: '💳' },
-              { id: 'cash', label: 'Cash at Canteen', icon: '💵' },
-            ].map(method => (
-              <label key={method.id} className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${paymentMethod === method.id ? 'border-primary-orange bg-orange-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                <input type="radio" name="paymentMethod" value={method.id} checked={paymentMethod === method.id} onChange={() => setPaymentMethod(method.id)} className="sr-only" />
-                <span className="text-2xl">{method.icon}</span>
-                <span className={`font-semibold ${paymentMethod === method.id ? 'text-primary-orange' : 'text-dark-text'}`}>{method.label}</span>
-                {paymentMethod === method.id && <CheckCircle2 className="w-5 h-5 text-primary-orange ml-auto" />}
-              </label>
-            ))}
-          </div>
-          <p className="text-lg font-bold text-dark-text mb-4">Total to pay: ₹{total}</p>
-          {paymentError && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">{paymentError}</div>
-          )}
-          <div className="flex gap-3">
-            <button onClick={() => setStep(2)} className="flex-1 py-3 border border-gray-200 text-secondary-gray rounded-xl font-semibold hover:bg-gray-50" disabled={isProcessing}>Back</button>
-            <button onClick={handlePayment} disabled={isProcessing} className="flex-1 py-3 bg-primary-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-colors disabled:opacity-70 flex items-center justify-center gap-2">
-              {isProcessing ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</> : paymentMethod === 'cash' ? 'Place Order' : 'Pay Now'}
-            </button>
+
+          <div className="p-6">
+            <h2 className="font-bold text-lg text-dark-text mb-4">Choose payment method</h2>
+            <div className="space-y-3 mb-6">
+              {[
+                { id: 'razorpay', label: 'UPI / Card / Netbanking', sub: 'Pay securely via Razorpay', icon: CreditCard },
+                { id: 'cash', label: 'Cash at Canteen', sub: 'Pay when you collect your order', icon: Wallet },
+              ].map(method => {
+                const Icon = method.icon;
+                const active = paymentMethod === method.id;
+                return (
+                  <label key={method.id} className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${active ? 'border-primary-orange bg-orange-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <input type="radio" name="paymentMethod" value={method.id} checked={active} onChange={() => setPaymentMethod(method.id)} className="sr-only" />
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${active ? 'bg-primary-orange text-white' : 'bg-gray-100 text-secondary-gray'}`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <p className={`font-semibold ${active ? 'text-primary-orange' : 'text-dark-text'}`}>{method.label}</p>
+                      <p className="text-xs text-secondary-gray mt-0.5">{method.sub}</p>
+                    </div>
+                    {active && <CheckCircle2 className="w-5 h-5 text-primary-orange shrink-0" />}
+                  </label>
+                );
+              })}
+            </div>
+
+            {paymentError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">{paymentError}</div>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={() => setStep(2)} className="flex-1 py-3 border border-gray-200 text-secondary-gray rounded-xl font-semibold hover:bg-gray-50" disabled={isProcessing}>Back</button>
+              <button onClick={handlePayment} disabled={isProcessing} className="flex-1 py-3 bg-primary-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-colors disabled:opacity-70 flex items-center justify-center gap-2">
+                {isProcessing ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</> : paymentMethod === 'cash' ? 'Place Order' : 'Pay Now'}
+              </button>
+            </div>
+
+            {paymentMethod === 'razorpay' && (
+              <p className="flex items-center justify-center gap-1.5 text-xs text-secondary-gray mt-4">
+                <ShieldCheck className="w-3.5 h-3.5" /> Secured by Razorpay
+              </p>
+            )}
           </div>
         </div>
       )}
