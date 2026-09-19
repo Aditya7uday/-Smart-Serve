@@ -65,6 +65,41 @@ class OrderFlowTests(APITestCase):
         })
         self.assertEqual(res.status_code, 400)
 
+    def test_customer_can_cancel_early_order_but_not_late_order(self):
+        customer = User.objects.create_user(email='canceller@test.demo', password='x', role='customer')
+        self.client.force_authenticate(user=customer)
+
+        order_res = self.client.post('/api/orders/', {
+            'customerId': customer.id,
+            'items': [{'id': self.item.id, 'name': self.item.name, 'price': 60, 'quantity': 1, 'customizations': []}],
+            'total': 60,
+            'type': 'pickup',
+            'paymentMethod': 'Cash',
+        }, format='json')
+        self.assertEqual(order_res.status_code, 201)
+        order_id = order_res.data['id']
+
+        # Still 'Placed' -> customer can cancel it themselves
+        cancel_res = self.client.patch(f'/api/orders/{order_id}/', {'status': 'Cancelled'}, format='json')
+        self.assertEqual(cancel_res.status_code, 200)
+        self.assertEqual(cancel_res.data['status'], 'Cancelled')
+
+        # A second order that's already out for delivery can no longer be self-cancelled
+        order2_res = self.client.post('/api/orders/', {
+            'customerId': customer.id,
+            'items': [{'id': self.item.id, 'name': self.item.name, 'price': 60, 'quantity': 1, 'customizations': []}],
+            'total': 60,
+            'type': 'delivery',
+            'paymentMethod': 'Cash',
+        }, format='json')
+        order2_id = order2_res.data['id']
+        self.client.force_authenticate(user=User.objects.create_superuser(email='admin2@test.demo', password='x'))
+        self.client.patch(f'/api/orders/{order2_id}/', {'status': 'Out for Delivery'}, format='json')
+
+        self.client.force_authenticate(user=customer)
+        late_cancel_res = self.client.patch(f'/api/orders/{order2_id}/', {'status': 'Cancelled'}, format='json')
+        self.assertEqual(late_cancel_res.status_code, 403)
+
     def test_profile_update_persists_but_cannot_change_role(self):
         user = User.objects.create_user(email='profile@test.demo', password='x', role='customer')
         self.client.force_authenticate(user=user)

@@ -1,34 +1,70 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useOrders } from '../../context/OrderContext';
 import { orderService } from '../../services/menuService';
+import { useToast } from '../../components/Toast';
 import { LoadingState } from '../../components/LoadingState';
 import { EmptyState } from '../../components/EmptyState';
-import { CheckCircle2, Circle, Loader2 } from 'lucide-react';
+import { CheckCircle2, Circle, Loader2, XCircle } from 'lucide-react';
 
 const DELIVERY_STEPS = ['Placed', 'Confirmed', 'Preparing', 'Ready', 'Out for Delivery', 'Delivered'];
 const PICKUP_STEPS = ['Placed', 'Confirmed', 'Preparing', 'Ready for Pickup', 'Collected'];
+const CANCELLABLE_STATUSES = ['Placed', 'Confirmed', 'Preparing'];
+const TERMINAL_STATUSES = ['Delivered', 'Collected', 'Cancelled'];
+const POLL_INTERVAL_MS = 5000;
 
 export function OrderStatus() {
   const { orderId } = useParams();
-  const { state: orderState } = useOrders();
+  const { dispatch: orderDispatch } = useOrders();
+  const { addToast } = useToast();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const lastStatusRef = useRef(null);
 
   useEffect(() => {
-    // Check context first (live updates), then service
-    const fromContext = orderState.orders.find(o => o.id === orderId);
-    if (fromContext) {
-      setOrder(fromContext);
-      setLoading(false);
-      return;
+    let cancelled = false;
+    let interval = null;
+
+    const fetchOrder = async () => {
+      try {
+        const data = await orderService.getOrder(orderId);
+        if (cancelled) return;
+        if (lastStatusRef.current && lastStatusRef.current !== data.status) {
+          addToast(`Order status updated: ${data.status}`, 'info');
+        }
+        lastStatusRef.current = data.status;
+        setOrder(data);
+        orderDispatch({ type: 'UPDATE_ORDER_STATUS', payload: { id: data.id, status: data.status, deliveryStaffId: data.deliveryStaffId } });
+        if (TERMINAL_STATUSES.includes(data.status) && interval) {
+          clearInterval(interval);
+        }
+      } catch {
+        if (!cancelled) setOrder(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchOrder();
+    interval = setInterval(fetchOrder, POLL_INTERVAL_MS);
+    return () => { cancelled = true; clearInterval(interval); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
+
+  const handleCancel = async () => {
+    setCancelling(true);
+    try {
+      const updated = await orderService.updateOrderStatus(orderId, 'Cancelled');
+      setOrder(updated);
+      orderDispatch({ type: 'UPDATE_ORDER_STATUS', payload: { id: updated.id, status: updated.status } });
+      addToast('Order cancelled.', 'success');
+    } catch (err) {
+      addToast(err.message || 'Failed to cancel order', 'error');
+    } finally {
+      setCancelling(false);
     }
-    orderService.getAllOrders().then(orders => {
-      const found = orders.find(o => o.id === orderId);
-      setOrder(found || null);
-      setLoading(false);
-    });
-  }, [orderId, orderState.orders]);
+  };
 
   if (loading) return <LoadingState message="Loading order status..." />;
   if (!order) return (
@@ -40,6 +76,7 @@ export function OrderStatus() {
   const steps = order.type === 'delivery' ? DELIVERY_STEPS : PICKUP_STEPS;
   const currentStepIndex = steps.indexOf(order.status);
   const isCancelled = order.status === 'Cancelled';
+  const canCancel = CANCELLABLE_STATUSES.includes(order.status);
 
   return (
     <div className="py-6 max-w-xl mx-auto">
@@ -100,6 +137,17 @@ export function OrderStatus() {
           <div className="flex justify-between font-bold text-dark-text text-base pt-1"><span>Total</span><span>₹{order.total}</span></div>
         </div>
       </div>
+
+      {canCancel && (
+        <button
+          onClick={handleCancel}
+          disabled={cancelling}
+          className="w-full mt-4 flex items-center justify-center gap-2 py-3 border-2 border-red-200 text-red-600 rounded-xl font-semibold hover:bg-red-50 transition-colors disabled:opacity-60"
+        >
+          {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+          {cancelling ? 'Cancelling...' : 'Cancel Order'}
+        </button>
+      )}
     </div>
   );
 }

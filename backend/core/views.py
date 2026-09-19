@@ -202,11 +202,24 @@ class OrderViewSet(viewsets.ModelViewSet):
             razorpay_payment_id=razorpay_payment_id,
         )
 
+    CANCELLABLE_STATUSES = {'Placed', 'Confirmed', 'Preparing'}
+
     def perform_update(self, serializer):
         user = self.request.user
+        incoming = set(self.request.data.keys())
+
         if user.role == 'customer':
-            raise PermissionDenied('Customers cannot modify an order after placing it.')
-        if user.role == 'delivery' and not set(self.request.data.keys()) <= {'status'}:
+            instance = serializer.instance
+            is_self_cancel = (
+                incoming == {'status'}
+                and serializer.validated_data.get('status') == 'Cancelled'
+                and instance.status in self.CANCELLABLE_STATUSES
+            )
+            if not is_self_cancel:
+                raise PermissionDenied(
+                    'Customers may only cancel their own order, and only before it starts preparing for pickup/delivery.'
+                )
+        elif user.role == 'delivery' and not incoming <= {'status'}:
             raise PermissionDenied('Delivery staff may only update order status.')
         serializer.save()
 
