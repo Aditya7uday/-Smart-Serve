@@ -10,6 +10,7 @@ export function Register() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
     confirmPassword: '',
     role: 'customer' // Default role
@@ -54,10 +55,11 @@ export function Register() {
     }
   };
 
-  const isFormValid = 
-    formData.name.trim() !== '' && 
-    formData.email.trim() !== '' && 
-    formData.password.trim() !== '' && 
+  const isFormValid =
+    formData.name.trim() !== '' &&
+    formData.email.trim() !== '' &&
+    formData.phone.trim() !== '' &&
+    formData.password.trim() !== '' &&
     formData.confirmPassword.trim() !== '';
 
   return (
@@ -102,6 +104,16 @@ export function Register() {
               value={formData.email}
               onChange={handleChange}
               placeholder="you@example.com"
+              required
+            />
+            <FormInput
+              label="Mobile Number"
+              id="phone"
+              name="phone"
+              type="tel"
+              value={formData.phone}
+              onChange={handleChange}
+              placeholder="9876543210"
               required
             />
             <FormInput
