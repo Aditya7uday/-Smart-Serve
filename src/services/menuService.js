@@ -72,4 +72,8 @@ export const orderService = {
   submitReview: async (reviewData) => {
     return apiRequest('/reviews/', { method: 'POST', body: reviewData });
   },
+
+  getReviews: async () => {
+    return apiRequest('/reviews/');
+  },
 };

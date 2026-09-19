@@ -6,11 +6,12 @@ import { useOrders } from '../../context/OrderContext';
 import { useToast } from '../../components/Toast';
 import { orderService } from '../../services/menuService';
 import { paymentService } from '../../services/paymentService';
-import { FormInput } from '../../components/FormInput';
 import { EmptyState } from '../../components/EmptyState';
-import { ShoppingCart, CheckCircle2, Loader2, ChevronRight, CreditCard, Wallet, ShieldCheck } from 'lucide-react';
+import { FormInput } from '../../components/FormInput';
+import { Link } from 'react-router-dom';
+import { ShoppingCart, CheckCircle2, Loader2, ChevronRight, CreditCard, Wallet, ShieldCheck, UserCircle, AlertTriangle } from 'lucide-react';
 
-const STEPS = ['Review Order', 'Your Details', 'Order Type', 'Payment', 'Confirmation'];
+const STEPS = ['Review Order', 'Order Type', 'Payment', 'Confirmation'];
 
 export function Checkout() {
   const { state: cartState, dispatch: cartDispatch } = useCart();
@@ -25,7 +26,7 @@ export function Checkout() {
   const [paymentError, setPaymentError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
-  const [details, setDetails] = useState({ name: authState.user?.name || '', phone: authState.user?.phone || '', address: '' });
+  const [details, setDetails] = useState({ address: '' });
   const [detailsErrors, setDetailsErrors] = useState({});
 
   const DELIVERY_FEE = 20;
@@ -33,7 +34,7 @@ export function Checkout() {
   const subtotal = cartState.total;
   const total = subtotal + DELIVERY_FEE + PLATFORM_FEE;
 
-  if (cartState.items.length === 0 && step < 4) {
+  if (cartState.items.length === 0 && step < 3) {
     return (
       <div className="py-12">
         <EmptyState icon={ShoppingCart} title="Your cart is empty" message="Add items first!" actionText="Explore Menu" actionHref="/customer/menu" />
@@ -41,10 +42,8 @@ export function Checkout() {
     );
   }
 
-  const validateDetails = () => {
+  const validateOrderType = () => {
     const errs = {};
-    if (!details.name.trim()) errs.name = 'Name is required';
-    if (!details.phone.trim()) errs.phone = 'Phone is required';
     if (orderType === 'delivery' && !details.address.trim()) errs.address = 'Delivery address is required';
     setDetailsErrors(errs);
     return Object.keys(errs).length === 0;
@@ -65,7 +64,7 @@ export function Checkout() {
       orderDispatch({ type: 'ADD_ORDER', payload: order });
       cartDispatch({ type: 'CLEAR_CART' });
       addToast('Order placed successfully! 🎉', 'success');
-      setStep(4);
+      setStep(3);
     } catch (err) {
       addToast(err.message || 'Failed to create order. Please retry.', 'error');
     } finally {
@@ -84,7 +83,7 @@ export function Checkout() {
 
     try {
       const rpOrder = await paymentService.createRazorpayOrder(total);
-      const digits = details.phone.replace(/\D/g, '');
+      const digits = (authState.user?.phone || '').replace(/\D/g, '');
       const contact = digits ? `+91${digits.slice(-10)}` : '';
       const rzp = new window.Razorpay({
         key: rpOrder.key,
@@ -94,7 +93,7 @@ export function Checkout() {
         name: 'Smart Serve',
         description: 'Canteen order payment',
         image: `${window.location.origin}/favicon.svg`,
-        prefill: { name: details.name, contact, email: authState.user?.email },
+        prefill: { name: authState.user?.name, contact, email: authState.user?.email },
         theme: { color: '#FF7A00' },
         handler: (response) => finalizeOrder({
           paymentMethod: 'Razorpay',
@@ -126,9 +125,9 @@ export function Checkout() {
   return (
     <div className="py-6 max-w-2xl mx-auto">
       {/* Step Indicator */}
-      {step < 4 && (
+      {step < 3 && (
         <div className="flex items-center justify-between mb-8 overflow-x-auto pb-2">
-          {STEPS.slice(0, 4).map((s, i) => (
+          {STEPS.slice(0, 3).map((s, i) => (
             <React.Fragment key={i}>
               <div className="flex flex-col items-center gap-1.5 min-w-max">
                 <div className={stepClasses(i)}>
@@ -136,7 +135,7 @@ export function Checkout() {
                 </div>
                 <span className={`text-xs font-medium ${i === step ? 'text-primary-orange' : 'text-secondary-gray'}`}>{s}</span>
               </div>
-              {i < 3 && <div className={`flex-1 h-0.5 mx-2 ${i < step ? 'bg-success-green' : 'bg-gray-200'}`} />}
+              {i < 2 && <div className={`flex-1 h-0.5 mx-2 ${i < step ? 'bg-success-green' : 'bg-gray-200'}`} />}
             </React.Fragment>
           ))}
         </div>
@@ -163,29 +162,34 @@ export function Checkout() {
             <div className="flex justify-between text-secondary-gray"><span>Platform fee</span><span>₹{PLATFORM_FEE}</span></div>
             <div className="flex justify-between font-bold text-dark-text text-base pt-1 border-t border-gray-100"><span>Total</span><span>₹{total}</span></div>
           </div>
+
+          <div className="border-t border-gray-100 mt-4 pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-dark-text text-sm">Contact Details</h3>
+              <Link to="/customer/profile" className="text-xs text-primary-orange font-medium hover:underline">Edit in Profile</Link>
+            </div>
+            <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
+              <UserCircle className="w-9 h-9 text-secondary-gray shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium text-dark-text">{authState.user?.name || '—'}</p>
+                <p className="text-secondary-gray">{authState.user?.phone || 'No phone on file'}</p>
+              </div>
+            </div>
+            {!authState.user?.phone && (
+              <p className="flex items-center gap-1.5 text-xs text-amber-700 mt-2">
+                <AlertTriangle className="w-3.5 h-3.5" /> Add a phone number in your profile for faster payment checkout.
+              </p>
+            )}
+          </div>
+
           <button onClick={() => setStep(1)} className="mt-6 w-full py-3 bg-primary-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2">
             Continue <ChevronRight className="w-5 h-5" />
           </button>
         </div>
       )}
 
-      {/* Step 1: Details */}
+      {/* Step 1: Order Type */}
       {step === 1 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="font-bold text-xl text-dark-text mb-4">Your Details</h2>
-          <div className="space-y-4">
-            <FormInput label="Full Name" id="checkout-name" value={details.name} onChange={e => setDetails(p => ({ ...p, name: e.target.value }))} error={detailsErrors.name} required />
-            <FormInput label="Phone Number" id="checkout-phone" type="tel" value={details.phone} onChange={e => setDetails(p => ({ ...p, phone: e.target.value }))} error={detailsErrors.phone} required />
-          </div>
-          <div className="flex gap-3 mt-6">
-            <button onClick={() => setStep(0)} className="flex-1 py-3 border border-gray-200 text-secondary-gray rounded-xl font-semibold hover:bg-gray-50">Back</button>
-            <button onClick={() => { if(validateDetails()) setStep(2); }} className="flex-1 py-3 bg-primary-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-colors">Continue</button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 2: Order Type */}
-      {step === 2 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="font-bold text-xl text-dark-text mb-4">How would you like to receive your order?</h2>
           <div className="grid grid-cols-2 gap-4 mb-4">
@@ -202,14 +206,14 @@ export function Checkout() {
             <FormInput label="Delivery Address" id="checkout-address" value={details.address} onChange={e => setDetails(p => ({ ...p, address: e.target.value }))} error={detailsErrors.address} placeholder="Room no / Block / Hostel name" required />
           )}
           <div className="flex gap-3 mt-6">
-            <button onClick={() => setStep(1)} className="flex-1 py-3 border border-gray-200 text-secondary-gray rounded-xl font-semibold hover:bg-gray-50">Back</button>
-            <button onClick={() => setStep(3)} className="flex-1 py-3 bg-primary-orange text-white rounded-xl font-bold hover:bg-orange-600">Continue</button>
+            <button onClick={() => setStep(0)} className="flex-1 py-3 border border-gray-200 text-secondary-gray rounded-xl font-semibold hover:bg-gray-50">Back</button>
+            <button onClick={() => { if (validateOrderType()) setStep(2); }} className="flex-1 py-3 bg-primary-orange text-white rounded-xl font-bold hover:bg-orange-600">Continue</button>
           </div>
         </div>
       )}
 
-      {/* Step 3: Payment */}
-      {step === 3 && (
+      {/* Step 2: Payment */}
+      {step === 2 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="bg-gradient-to-br from-primary-orange to-orange-600 px-6 py-6 text-white">
             <p className="text-sm font-medium text-orange-100">Amount to pay</p>
@@ -224,7 +228,9 @@ export function Checkout() {
             <div className="space-y-3 mb-6">
               {[
                 { id: 'razorpay', label: 'UPI / Card / Netbanking', sub: 'Pay securely via Razorpay', icon: CreditCard },
-                { id: 'cash', label: 'Cash at Canteen', sub: 'Pay when you collect your order', icon: Wallet },
+                orderType === 'delivery'
+                  ? { id: 'cash', label: 'Cash on Delivery', sub: 'Pay the delivery staff when your order arrives', icon: Wallet }
+                  : { id: 'cash', label: 'Cash at Canteen', sub: 'Pay when you collect your order', icon: Wallet },
               ].map(method => {
                 const Icon = method.icon;
                 const active = paymentMethod === method.id;
@@ -249,7 +255,7 @@ export function Checkout() {
             )}
 
             <div className="flex gap-3">
-              <button onClick={() => setStep(2)} className="flex-1 py-3 border border-gray-200 text-secondary-gray rounded-xl font-semibold hover:bg-gray-50" disabled={isProcessing}>Back</button>
+              <button onClick={() => setStep(1)} className="flex-1 py-3 border border-gray-200 text-secondary-gray rounded-xl font-semibold hover:bg-gray-50" disabled={isProcessing}>Back</button>
               <button onClick={handlePayment} disabled={isProcessing} className="flex-1 py-3 bg-primary-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-colors disabled:opacity-70 flex items-center justify-center gap-2">
                 {isProcessing ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</> : paymentMethod === 'cash' ? 'Place Order' : 'Pay Now'}
               </button>
@@ -265,7 +271,7 @@ export function Checkout() {
       )}
 
       {/* Step 4: Confirmation */}
-      {step === 4 && createdOrder && (
+      {step === 3 && createdOrder && (
         <div className="text-center">
           <div className="w-20 h-20 bg-success-green/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-12 h-12 text-success-green" />
