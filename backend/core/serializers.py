@@ -19,6 +19,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     name = serializers.CharField(source='first_name')
     password = serializers.CharField(write_only=True, min_length=6)
+    role = serializers.ChoiceField(choices=[('customer', 'Customer'), ('delivery', 'Delivery')], default='customer')
 
     class Meta:
         model = User

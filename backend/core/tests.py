@@ -31,7 +31,7 @@ class OrderFlowTests(APITestCase):
             'customerId': user_id,
             'items': [{'id': self.item.id, 'name': self.item.name, 'price': 60, 'quantity': 2, 'customizations': []}],
             'total': 120,
-            'type': 'pickup',
+            'type': 'delivery',
             'paymentMethod': 'Cash',
         }, format='json')
         self.assertEqual(order_res.status_code, 201)
@@ -44,3 +44,23 @@ class OrderFlowTests(APITestCase):
         list_res = self.client.get('/api/orders/')
         self.assertEqual(list_res.status_code, 200)
         self.assertEqual(len(list_res.data), 0)
+        self.client.force_authenticate(user=None)
+
+        # The owning customer cannot rewrite their own order (price/status tampering)
+        order_id = order_res.data['id']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+        tamper_res = self.client.patch(f'/api/orders/{order_id}/', {'status': 'Delivered'}, format='json')
+        self.assertEqual(tamper_res.status_code, 403)
+        self.client.credentials()
+
+        # Delivery staff may only change status, not price/items
+        rider = User.objects.create_user(email='rider@test.demo', password='x', role='delivery')
+        self.client.force_authenticate(user=rider)
+        overreach_res = self.client.patch(f'/api/orders/{order_id}/', {'total': 1}, format='json')
+        self.assertEqual(overreach_res.status_code, 403)
+
+    def test_register_cannot_grant_admin_role(self):
+        res = self.client.post('/api/auth/register/', {
+            'name': 'Sneaky', 'email': 'sneaky@test.demo', 'password': 'testpass123', 'role': 'admin',
+        })
+        self.assertEqual(res.status_code, 400)

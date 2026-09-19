@@ -3,6 +3,7 @@ from django.db.models import F, Sum
 from django.utils import timezone
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -136,11 +137,29 @@ class OrderViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(customer=self.request.user)
 
+    def perform_update(self, serializer):
+        user = self.request.user
+        if user.role == 'customer':
+            raise PermissionDenied('Customers cannot modify an order after placing it.')
+        if user.role == 'delivery' and not set(self.request.data.keys()) <= {'status'}:
+            raise PermissionDenied('Delivery staff may only update order status.')
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if self.request.user.role != 'admin':
+            raise PermissionDenied('Only admins can delete orders.')
+        instance.delete()
+
 
 class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all().order_by('-date')
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ('update', 'partial_update', 'destroy', 'toggle_hidden'):
+            return [IsAdminRole()]
+        return super().get_permissions()
 
     @action(detail=True, methods=['patch'])
     def toggle_hidden(self, request, pk=None):
