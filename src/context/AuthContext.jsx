@@ -1,5 +1,6 @@
-import { createContext, useReducer, useContext } from 'react';
+import { createContext, useReducer, useContext, useEffect } from 'react';
 import { tokenStore } from '../services/apiClient';
+import { authService } from '../services/authService';
 
 const AuthContext = createContext();
 
@@ -38,6 +39,16 @@ function authReducer(state, action) {
 
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
+
+  // The cached user (localStorage) can go stale, e.g. a phone number saved on
+  // another device/session. Refresh from the DB once on load.
+  useEffect(() => {
+    if (!state.isAuthenticated) return;
+    authService.me()
+      .then(user => dispatch({ type: 'LOGIN', payload: user }))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <AuthContext.Provider value={{ state, dispatch }}>

@@ -8,7 +8,8 @@ import { orderService } from '../../services/menuService';
 import { StatusBadge } from '../../components/StatusBadge';
 import { LoadingState } from '../../components/LoadingState';
 import { EmptyState } from '../../components/EmptyState';
-import { RefreshCcw, Eye } from 'lucide-react';
+import { Modal } from '../../components/Modal';
+import { RefreshCcw, Eye, Star, Loader2 } from 'lucide-react';
 
 const FILTERS = ['All', 'Active', 'Completed', 'Cancelled'];
 
@@ -21,14 +22,48 @@ export function MyOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('All');
+  const [reviewedOrderIds, setReviewedOrderIds] = useState(new Set());
+  const [reviewOrder, setReviewOrder] = useState(null);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
-    orderService.getOrdersForUser(authState.user?.id).then(data => {
+    Promise.all([
+      orderService.getOrdersForUser(authState.user?.id),
+      orderService.getReviews(),
+    ]).then(([data, reviews]) => {
       setOrders(data);
       orderDispatch({ type: 'SET_ORDERS', payload: data });
+      setReviewedOrderIds(new Set(reviews.filter(r => r.orderId).map(r => r.orderId)));
       setLoading(false);
     });
   }, [authState.user?.id]);
+
+  const openReviewModal = (order) => {
+    setReviewOrder(order);
+    setRating(5);
+    setComment('');
+  };
+
+  const submitReview = async () => {
+    setSubmittingReview(true);
+    try {
+      await orderService.submitReview({
+        orderId: reviewOrder.id,
+        customerName: authState.user?.name,
+        rating,
+        comment,
+      });
+      setReviewedOrderIds(prev => new Set(prev).add(reviewOrder.id));
+      addToast('Thanks for your feedback!', 'success');
+      setReviewOrder(null);
+    } catch (err) {
+      addToast(err.message || 'Failed to submit review', 'error');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   // Merge with context for live updates
   const mergedOrders = orders.map(o => {
@@ -93,15 +128,59 @@ export function MyOrders() {
                     <Eye className="w-4 h-4" /> Track
                   </Link>
                   {['Delivered', 'Collected'].includes(order.status) && (
-                    <button onClick={() => handleReorder(order)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-orange text-white rounded-lg hover:bg-orange-600 transition-colors">
-                      <RefreshCcw className="w-4 h-4" /> Reorder
-                    </button>
+                    <>
+                      {reviewedOrderIds.has(order.id) ? (
+                        <span className="flex items-center gap-1 px-3 py-1.5 text-sm text-amber-600">
+                          <Star className="w-4 h-4 fill-amber-400 stroke-amber-400" /> Reviewed
+                        </span>
+                      ) : (
+                        <button onClick={() => openReviewModal(order)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-amber-200 text-amber-600 rounded-lg hover:bg-amber-50 transition-colors">
+                          <Star className="w-4 h-4" /> Rate Order
+                        </button>
+                      )}
+                      <button onClick={() => handleReorder(order)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-orange text-white rounded-lg hover:bg-orange-600 transition-colors">
+                        <RefreshCcw className="w-4 h-4" /> Reorder
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {reviewOrder && (
+        <Modal isOpen={true} onClose={() => setReviewOrder(null)} title={`Rate Order — ${reviewOrder.id}`} maxWidth="max-w-sm">
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-medium text-dark-text mb-2">How was your order?</p>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button key={n} type="button" onClick={() => setRating(n)} className="p-0.5">
+                    <Star className={`w-8 h-8 ${n <= rating ? 'fill-amber-400 stroke-amber-400' : 'stroke-gray-300'}`} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-dark-text mb-1">Comment (optional)</label>
+              <textarea
+                value={comment}
+                onChange={e => setComment(e.target.value)}
+                rows={3}
+                placeholder="Tell us about the food, packaging, or delivery..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-orange resize-none text-sm"
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setReviewOrder(null)} className="flex-1 py-2.5 border border-gray-200 text-secondary-gray rounded-xl font-medium hover:bg-gray-50">Cancel</button>
+              <button onClick={submitReview} disabled={submittingReview} className="flex-1 py-2.5 bg-primary-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-colors disabled:opacity-70 flex items-center justify-center gap-2">
+                {submittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
