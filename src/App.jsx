@@ -8,6 +8,7 @@ import { Landing } from './pages/Landing/Landing';
 import { Login } from './pages/Auth/Login';
 import { Register } from './pages/Auth/Register';
 import { ForgotPassword } from './pages/Auth/ForgotPassword';
+import { ResetPassword } from './pages/Auth/ResetPassword';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 
 import { CustomerDashboard } from './pages/Customer/CustomerDashboard';
@@ -38,6 +39,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
         </Route>
 
         {/* Customer Routes */}

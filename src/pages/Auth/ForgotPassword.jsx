@@ -10,6 +10,7 @@ export function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
+  const [resetLink, setResetLink] = useState('');
   const [error, setError] = useState('');
   const [fieldError, setFieldError] = useState('');
 
@@ -32,9 +33,10 @@ export function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      await authService.resetPassword(email);
+      const result = await authService.resetPassword(email);
+      setResetLink(`${window.location.origin}/reset-password/${result.uid}/${result.token}`);
       setIsSent(true);
-      addToast('Password reset link sent to your email!', 'success');
+      addToast('Password reset link generated!', 'success');
     } catch (err) {
       setError(err.message || 'Failed to send reset link');
       addToast(err.message || 'Failed to send reset link', 'error');
@@ -64,8 +66,12 @@ export function ForgotPassword() {
 
         {isSent ? (
           <div className="text-center space-y-6">
-            <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-lg">
-              We've sent a password reset link to <strong>{email}</strong>. Please check your inbox.
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-lg text-left">
+              <p className="font-semibold mb-1">⚠️ No email service is set up for this project.</p>
+              <p className="text-sm mb-3">In a real deployment this link would be emailed to <strong>{email}</strong>. For now, here it is directly:</p>
+              <Link to={resetLink.replace(window.location.origin, '')} className="block w-full text-center text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg px-3 py-2 break-all transition-colors">
+                Reset my password →
+              </Link>
             </div>
             <Link to="/login" className="inline-flex items-center gap-2 text-primary-orange hover:text-orange-600 font-medium">
               <ArrowLeft className="w-4 h-4" /> Back to login

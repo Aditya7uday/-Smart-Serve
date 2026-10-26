@@ -29,6 +29,14 @@ export const authService = {
     });
   },
 
+  confirmResetPassword: async ({ uid, token, password }) => {
+    return apiRequest('/auth/reset-password-confirm/', {
+      method: 'POST',
+      auth: false,
+      body: { uid, token, password },
+    });
+  },
+
   me: async () => apiRequest('/auth/me/'),
 
   updateProfile: async (updates) => apiRequest('/auth/me/', { method: 'PATCH', body: updates }),

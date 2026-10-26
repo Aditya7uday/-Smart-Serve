@@ -1,8 +1,11 @@
 import razorpay
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.db.models import F, Sum
 from django.utils import timezone
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -92,13 +95,52 @@ class MeView(APIView):
 
 
 class ResetPasswordView(APIView):
+    """
+    No email service is configured for this project, so instead of sending
+    an email, the reset link is returned directly in the response for the
+    frontend to display. Swap this for a real email send once a mail
+    provider is set up; the token/confirm logic below doesn't need to change.
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
         email = request.data.get('email')
-        if not User.objects.filter(email=email).exists():
+        user = User.objects.filter(email=email).first()
+        if not user:
             return Response({'detail': 'No account found with this email'}, status=status.HTTP_404_NOT_FOUND)
-        return Response({'success': True, 'message': 'Password reset instructions sent to your email.'})
+
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = PasswordResetTokenGenerator().make_token(user)
+        return Response({
+            'success': True,
+            'message': 'Password reset link generated.',
+            'uid': uid,
+            'token': token,
+        })
+
+
+class ResetPasswordConfirmView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        uid = request.data.get('uid')
+        token = request.data.get('token')
+        password = request.data.get('password')
+
+        if not password or len(password) < 6:
+            return Response({'detail': 'Password must be at least 6 characters'}, status=400)
+
+        try:
+            user = User.objects.get(pk=force_str(urlsafe_base64_decode(uid)))
+        except (User.DoesNotExist, ValueError, TypeError, OverflowError):
+            return Response({'detail': 'Invalid or expired reset link'}, status=400)
+
+        if not PasswordResetTokenGenerator().check_token(user, token):
+            return Response({'detail': 'Invalid or expired reset link'}, status=400)
+
+        user.set_password(password)
+        user.save()
+        return Response({'success': True, 'message': 'Password has been reset.'})
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
