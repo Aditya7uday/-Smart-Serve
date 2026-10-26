@@ -8,7 +8,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { LoadingState } from '../../components/LoadingState';
 import { EmptyState } from '../../components/EmptyState';
 import { useToast } from '../../components/Toast';
-import { Package, CheckCircle2, Clock, Truck, ArrowRight, ChevronRight } from 'lucide-react';
+import { Package, CheckCircle2, Clock, Truck, ArrowRight, ChevronRight, MapPin, Phone } from 'lucide-react';
 
 const STATUS_CHAIN = ['Accepted', 'Picked Up', 'Out for Delivery', 'Delivered'];
 
@@ -104,6 +104,20 @@ export function DeliveryDashboard() {
                       <p className="text-sm text-secondary-gray mt-0.5">Customer: {order.customerName}</p>
                     </div>
                     <StatusBadge status={order.status} />
+                  </div>
+                  <div className="space-y-1.5 mb-4">
+                    {order.customerPhone && (
+                      <a href={`tel:${order.customerPhone}`} className="flex items-center gap-2 text-sm text-secondary-gray hover:text-primary-orange transition-colors w-fit">
+                        <Phone className="w-4 h-4 shrink-0" />
+                        {order.customerPhone}
+                      </a>
+                    )}
+                    {order.dormLocation && (
+                      <p className="flex items-center gap-2 text-sm text-secondary-gray">
+                        <MapPin className="w-4 h-4 shrink-0" />
+                        {order.dormLocation}
+                      </p>
+                    )}
                   </div>
                   <div className="text-sm text-secondary-gray mb-4">
                     <span className="font-medium text-dark-text">Items: </span>

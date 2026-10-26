@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useToast } from '../../components/Toast';
 import { authService } from '../../services/authService';
 import { FormInput } from '../../components/FormInput';
+import { isValidEmail } from '../../utils/validators';
 import { Loader2, Mail, ArrowLeft } from 'lucide-react';
 
 export function ForgotPassword() {
@@ -10,12 +11,24 @@ export function ForgotPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
   const [error, setError] = useState('');
-  
+  const [fieldError, setFieldError] = useState('');
+
   const { addToast } = useToast();
+
+  const validateEmail = (value) => {
+    if (!value.trim()) return 'Email is required';
+    if (!isValidEmail(value)) return 'Enter a valid email address';
+    return '';
+  };
+
+  const handleBlur = () => setFieldError(validateEmail(email));
 
   const handleReset = async (e) => {
     e.preventDefault();
     setError('');
+    const err = validateEmail(email);
+    if (err) { setFieldError(err); return; }
+    setFieldError('');
     setIsLoading(true);
 
     try {
@@ -59,14 +72,16 @@ export function ForgotPassword() {
             </Link>
           </div>
         ) : (
-          <form className="mt-8 space-y-6" onSubmit={handleReset}>
+          <form className="mt-8 space-y-6" onSubmit={handleReset} noValidate>
             <FormInput
               label="Email address"
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); setFieldError(''); }}
+              onBlur={handleBlur}
               placeholder="you@example.com"
+              error={fieldError}
               required
             />
 

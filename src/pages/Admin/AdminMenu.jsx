@@ -7,6 +7,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Modal } from '../../components/Modal';
 import { FormInput } from '../../components/FormInput';
 import { StatusBadge } from '../../components/StatusBadge';
+import { isValidUrl } from '../../utils/validators';
 import { Plus, Pencil, Trash2, Search, ToggleLeft, ToggleRight } from 'lucide-react';
 
 const emptyItem = { name: '', price: '', categoryId: '', description: '', image: '', isVeg: true, available: true };
@@ -20,6 +21,7 @@ export function AdminMenu() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [formData, setFormData] = useState(emptyItem);
+  const [formErrors, setFormErrors] = useState({});
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryIcon, setNewCategoryIcon] = useState('');
@@ -32,24 +34,62 @@ export function AdminMenu() {
 
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
 
-  const openAdd = () => { setEditItem(null); setFormData(emptyItem); setNewCategoryName(''); setNewCategoryIcon(''); setModalOpen(true); };
-  const openEdit = (item) => { setEditItem(item); setFormData({ ...item, price: String(item.price) }); setNewCategoryName(''); setNewCategoryIcon(''); setModalOpen(true); };
+  const openAdd = () => { setEditItem(null); setFormData(emptyItem); setFormErrors({}); setNewCategoryName(''); setNewCategoryIcon(''); setModalOpen(true); };
+  const openEdit = (item) => { setEditItem(item); setFormData({ ...item, price: String(item.price) }); setFormErrors({}); setNewCategoryName(''); setNewCategoryIcon(''); setModalOpen(true); };
+
+  const validateField = (name) => {
+    switch (name) {
+      case 'name':
+        if (!formData.name.trim()) return 'Item name is required';
+        return undefined;
+      case 'price': {
+        const price = Number(formData.price);
+        if (formData.price === '' || Number.isNaN(price)) return 'Price is required';
+        if (price <= 0) return 'Price must be greater than 0';
+        return undefined;
+      }
+      case 'categoryId':
+        if (!formData.categoryId) return 'Select a category';
+        return undefined;
+      case 'newCategoryName':
+        if (formData.categoryId === NEW_CATEGORY_VALUE && !newCategoryName.trim()) return 'Enter a name for the new category';
+        return undefined;
+      case 'image':
+        if (formData.image && !isValidUrl(formData.image)) return 'Enter a valid image URL';
+        return undefined;
+      default:
+        return undefined;
+    }
+  };
+
+  const handleFieldBlur = (e) => {
+    const { name } = e.target;
+    setFormErrors(prev => ({ ...prev, [name]: validateField(name) }));
+  };
+
+  const validate = () => {
+    const fields = ['name', 'price', 'categoryId', 'newCategoryName', 'image'];
+    const errs = {};
+    fields.forEach(name => {
+      const err = validateField(name);
+      if (err) errs[name] = err;
+    });
+    setFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!validate()) return;
     try {
       let categoryId = formData.categoryId;
       if (categoryId === NEW_CATEGORY_VALUE) {
-        if (!newCategoryName.trim()) {
-          addToast('Enter a name for the new category', 'error');
-          return;
-        }
         const newCat = await menuService.addCategory({ name: newCategoryName.trim(), icon: newCategoryIcon.trim() });
         setCats(prev => [...prev, newCat]);
         categoryId = newCat.id;
       }
 
-      const payload = { ...formData, categoryId, price: Number(formData.price) };
+      const payload = { ...formData, name: formData.name.trim(), categoryId, price: Number(formData.price) };
       if (editItem) {
         const updated = await menuService.updateMenuItem(editItem.id, payload);
         setItems(prev => prev.map(i => i.id === editItem.id ? updated : i));
@@ -155,23 +195,24 @@ export function AdminMenu() {
 
       {/* Add/Edit Modal */}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editItem ? 'Edit Item' : 'Add New Item'} maxWidth="max-w-lg">
-        <form onSubmit={handleSave} className="space-y-4">
-          <FormInput label="Item Name" id="item-name" value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} required />
+        <form onSubmit={handleSave} className="space-y-4" noValidate>
+          <FormInput label="Item Name" id="item-name" name="name" value={formData.name} onChange={e => { setFormData(p => ({ ...p, name: e.target.value })); setFormErrors(p => ({ ...p, name: undefined })); }} onBlur={handleFieldBlur} error={formErrors.name} required />
           <div className="grid grid-cols-2 gap-4">
-            <FormInput label="Price (₹)" id="item-price" type="number" value={formData.price} onChange={e => setFormData(p => ({ ...p, price: e.target.value }))} required />
+            <FormInput label="Price (₹)" id="item-price" name="price" type="number" min="0.01" step="0.01" value={formData.price} onChange={e => { setFormData(p => ({ ...p, price: e.target.value })); setFormErrors(p => ({ ...p, price: undefined })); }} onBlur={handleFieldBlur} error={formErrors.price} required />
             <div>
               <label className="block text-sm font-medium text-dark-text mb-1">Category <span className="text-red-500">*</span></label>
-              <select value={formData.categoryId} onChange={e => setFormData(p => ({ ...p, categoryId: e.target.value }))} required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-orange bg-white text-sm">
+              <select name="categoryId" value={formData.categoryId} onChange={e => { setFormData(p => ({ ...p, categoryId: e.target.value })); setFormErrors(p => ({ ...p, categoryId: undefined })); }} onBlur={handleFieldBlur} required
+                className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-orange bg-white text-sm ${formErrors.categoryId ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}>
                 <option value="">Select category</option>
                 {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 <option value={NEW_CATEGORY_VALUE}>+ Other (add new category)</option>
               </select>
+              {formErrors.categoryId && <p className="mt-1 text-sm text-red-500">{formErrors.categoryId}</p>}
             </div>
           </div>
           {formData.categoryId === NEW_CATEGORY_VALUE && (
             <div className="grid grid-cols-[1fr_auto] gap-3 -mt-2 p-3 bg-orange-50 border border-orange-100 rounded-lg">
-              <FormInput label="New Category Name" id="new-category-name" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="e.g. Wraps" required />
+              <FormInput label="New Category Name" id="new-category-name" name="newCategoryName" value={newCategoryName} onChange={e => { setNewCategoryName(e.target.value); setFormErrors(p => ({ ...p, newCategoryName: undefined })); }} onBlur={handleFieldBlur} placeholder="e.g. Wraps" error={formErrors.newCategoryName} required />
               <FormInput label="Icon" id="new-category-icon" value={newCategoryIcon} onChange={e => setNewCategoryIcon(e.target.value)} placeholder="🌯" />
             </div>
           )}
@@ -180,7 +221,7 @@ export function AdminMenu() {
             <textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
               rows={2} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-orange resize-none text-sm" />
           </div>
-          <FormInput label="Image URL" id="item-image" value={formData.image} onChange={e => setFormData(p => ({ ...p, image: e.target.value }))} />
+          <FormInput label="Image URL" id="item-image" name="image" value={formData.image} onChange={e => { setFormData(p => ({ ...p, image: e.target.value })); setFormErrors(p => ({ ...p, image: undefined })); }} onBlur={handleFieldBlur} error={formErrors.image} placeholder="https://..." />
           <div className="flex gap-6">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={formData.isVeg} onChange={e => setFormData(p => ({ ...p, isVeg: e.target.checked }))} className="accent-success-green w-4 h-4" />

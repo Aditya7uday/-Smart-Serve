@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/Toast';
 import { authService } from '../../services/authService';
 import { FormInput } from '../../components/FormInput';
+import { isValidEmail, isValidPhone } from '../../utils/validators';
 import { Loader2, UserPlus } from 'lucide-react';
 
 export function Register() {
@@ -17,7 +18,8 @@ export function Register() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
+  const [fieldErrors, setFieldErrors] = useState({});
+
   const { dispatch } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -25,26 +27,68 @@ export function Register() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    setFieldErrors(prev => ({ ...prev, [name]: undefined }));
+  };
+
+  const validateField = (name, data) => {
+    switch (name) {
+      case 'name':
+        if (!data.name.trim()) return 'Full name is required';
+        return undefined;
+      case 'email':
+        if (!data.email.trim()) return 'Email is required';
+        if (!isValidEmail(data.email)) return 'Enter a valid email address';
+        return undefined;
+      case 'phone':
+        if (!data.phone.trim()) return 'Mobile number is required';
+        if (!isValidPhone(data.phone)) return 'Enter a valid 10-digit mobile number';
+        return undefined;
+      case 'password':
+        if (!data.password) return 'Password is required';
+        if (data.password.length < 6) return 'Password must be at least 6 characters';
+        return undefined;
+      case 'confirmPassword':
+        if (!data.confirmPassword) return 'Please confirm your password';
+        if (data.password !== data.confirmPassword) return "Passwords don't match";
+        return undefined;
+      default:
+        return undefined;
+    }
+  };
+
+  const handleBlur = (e) => {
+    const { name } = e.target;
+    const error = validateField(name, formData);
+    setFieldErrors(prev => ({ ...prev, [name]: error }));
+  };
+
+  const validate = () => {
+    const fields = ['name', 'email', 'phone', 'password', 'confirmPassword'];
+    const errs = {};
+    fields.forEach(name => {
+      const error = validateField(name, formData);
+      if (error) errs[name] = error;
+    });
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
-
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords don't match");
-      return;
-    }
+    if (!validate()) return;
 
     setIsLoading(true);
 
     try {
       const { confirmPassword, ...registerData } = formData;
+      registerData.name = registerData.name.trim();
+      registerData.email = registerData.email.trim();
       const user = await authService.register(registerData);
-      
+
       dispatch({ type: 'LOGIN', payload: user });
       addToast(`Account created successfully! Welcome, ${user.name}!`, 'success');
-      
+
       const redirectPath = user.role === 'delivery' ? '/delivery/dashboard' : '/customer/dashboard';
       navigate(redirectPath, { replace: true });
     } catch (err) {
@@ -59,8 +103,8 @@ export function Register() {
     formData.name.trim() !== '' &&
     formData.email.trim() !== '' &&
     formData.phone.trim() !== '' &&
-    formData.password.trim() !== '' &&
-    formData.confirmPassword.trim() !== '';
+    formData.password !== '' &&
+    formData.confirmPassword !== '';
 
   return (
     <div className="min-h-[calc(100vh-130px)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -84,7 +128,7 @@ export function Register() {
           </div>
         )}
 
-        <form className="mt-8 space-y-6" onSubmit={handleRegister}>
+        <form className="mt-8 space-y-6" onSubmit={handleRegister} noValidate>
           <div className="space-y-4">
             <FormInput
               label="Full Name"
@@ -93,7 +137,9 @@ export function Register() {
               type="text"
               value={formData.name}
               onChange={handleChange}
+              onBlur={handleBlur}
               placeholder="John Doe"
+              error={fieldErrors.name}
               required
             />
             <FormInput
@@ -103,7 +149,9 @@ export function Register() {
               type="email"
               value={formData.email}
               onChange={handleChange}
+              onBlur={handleBlur}
               placeholder="you@example.com"
+              error={fieldErrors.email}
               required
             />
             <FormInput
@@ -113,7 +161,9 @@ export function Register() {
               type="tel"
               value={formData.phone}
               onChange={handleChange}
+              onBlur={handleBlur}
               placeholder="9876543210"
+              error={fieldErrors.phone}
               required
             />
             <FormInput
@@ -123,7 +173,9 @@ export function Register() {
               type="password"
               value={formData.password}
               onChange={handleChange}
+              onBlur={handleBlur}
               placeholder="••••••••"
+              error={fieldErrors.password}
               required
             />
             <FormInput
@@ -133,7 +185,9 @@ export function Register() {
               type="password"
               value={formData.confirmPassword}
               onChange={handleChange}
+              onBlur={handleBlur}
               placeholder="••••••••"
+              error={fieldErrors.confirmPassword}
               required
             />
 

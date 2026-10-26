@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.validators import MinValueValidator
 from django.db import models
 
 
@@ -51,7 +54,7 @@ class Category(models.Model):
 class MenuItem(models.Model):
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='items')
     name = models.CharField(max_length=200)
-    price = models.DecimalField(max_digits=8, decimal_places=2)
+    price = models.DecimalField(max_digits=8, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
     is_veg = models.BooleanField(default=True)
     rating = models.DecimalField(max_digits=3, decimal_places=1, default=0)
     reviews_count = models.PositiveIntegerField(default=0)
@@ -66,8 +69,8 @@ class MenuItem(models.Model):
 
 class InventoryItem(models.Model):
     name = models.CharField(max_length=200)
-    current_stock = models.IntegerField(default=0)
-    min_stock = models.IntegerField(default=0)
+    current_stock = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    min_stock = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     unit = models.CharField(max_length=20, default='pcs')
 
     @property

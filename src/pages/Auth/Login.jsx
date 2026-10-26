@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/Toast';
 import { authService } from '../../services/authService';
 import { FormInput } from '../../components/FormInput';
+import { isValidEmail } from '../../utils/validators';
 import { Loader2, KeyRound } from 'lucide-react';
 
 export function Login() {
@@ -11,7 +12,8 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
+  const [fieldErrors, setFieldErrors] = useState({});
+
   const { dispatch } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -19,9 +21,37 @@ export function Login() {
 
   const from = location.state?.from?.pathname || '/';
 
+  const validateField = (name, { emailVal, passwordVal }) => {
+    if (name === 'email') {
+      if (!emailVal.trim()) return 'Email is required';
+      if (!isValidEmail(emailVal)) return 'Enter a valid email address';
+    }
+    if (name === 'password') {
+      if (!passwordVal) return 'Password is required';
+    }
+    return undefined;
+  };
+
+  const handleBlur = (e) => {
+    const { name } = e.target;
+    const error = validateField(name, { emailVal: email, passwordVal: password });
+    setFieldErrors(prev => ({ ...prev, [name]: error }));
+  };
+
+  const validate = () => {
+    const errs = {};
+    const emailErr = validateField('email', { emailVal: email, passwordVal: password });
+    const passwordErr = validateField('password', { emailVal: email, passwordVal: password });
+    if (emailErr) errs.email = emailErr;
+    if (passwordErr) errs.password = passwordErr;
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    if (!validate()) return;
     setIsLoading(true);
 
     try {
@@ -80,24 +110,30 @@ export function Login() {
           </div>
         )}
 
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+        <form className="mt-8 space-y-6" onSubmit={handleLogin} noValidate>
           <div className="space-y-4">
             <FormInput
               label="Email address"
               id="email"
+              name="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); setFieldErrors(p => ({ ...p, email: undefined })); }}
+              onBlur={handleBlur}
               placeholder="you@example.com"
+              error={fieldErrors.email}
               required
             />
             <FormInput
               label="Password"
               id="password"
+              name="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); setFieldErrors(p => ({ ...p, password: undefined })); }}
+              onBlur={handleBlur}
               placeholder="••••••••"
+              error={fieldErrors.password}
               required
             />
           </div>

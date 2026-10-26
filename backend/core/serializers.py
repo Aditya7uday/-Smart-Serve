@@ -71,6 +71,7 @@ class OrderSerializer(serializers.ModelSerializer):
         source='customer', queryset=User.objects.all(), pk_field=serializers.CharField()
     )
     customerName = serializers.SerializerMethodField()
+    customerPhone = serializers.SerializerMethodField()
     paymentMethod = serializers.CharField(source='payment_method')
     deliveryStaffId = serializers.PrimaryKeyRelatedField(
         source='delivery_staff', queryset=User.objects.all(), allow_null=True, required=False,
@@ -81,10 +82,13 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'customerId', 'customerName', 'items', 'total', 'type', 'status',
+            'id', 'customerId', 'customerName', 'customerPhone', 'items', 'total', 'type', 'status',
             'paymentMethod', 'timestamp', 'deliveryStaffId', 'dormLocation',
         ]
         read_only_fields = ['timestamp']
+
+    def get_customerPhone(self, obj):
+        return obj.customer.phone
 
     def get_customerName(self, obj):
         return obj.customer.first_name or obj.customer.email

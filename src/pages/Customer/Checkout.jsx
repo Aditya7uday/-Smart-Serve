@@ -42,11 +42,20 @@ export function Checkout() {
     );
   }
 
+  const validateAddress = () => {
+    if (orderType !== 'delivery') return undefined;
+    const address = details.address.trim();
+    if (!address) return 'Delivery address is required';
+    if (address.length < 5) return 'Enter a more complete address';
+    return undefined;
+  };
+
+  const handleAddressBlur = () => setDetailsErrors(prev => ({ ...prev, address: validateAddress() }));
+
   const validateOrderType = () => {
-    const errs = {};
-    if (orderType === 'delivery' && !details.address.trim()) errs.address = 'Delivery address is required';
-    setDetailsErrors(errs);
-    return Object.keys(errs).length === 0;
+    const err = validateAddress();
+    setDetailsErrors(err ? { address: err } : {});
+    return !err;
   };
 
   const finalizeOrder = async (extraFields) => {
@@ -58,6 +67,7 @@ export function Checkout() {
         total,
         type: orderType,
         status: 'Placed',
+        ...(orderType === 'delivery' ? { dormLocation: details.address.trim() } : {}),
         ...extraFields,
       });
       setCreatedOrder(order);
@@ -203,7 +213,7 @@ export function Checkout() {
             ))}
           </div>
           {orderType === 'delivery' && (
-            <FormInput label="Delivery Address" id="checkout-address" value={details.address} onChange={e => setDetails(p => ({ ...p, address: e.target.value }))} error={detailsErrors.address} placeholder="Room no / Block / Hostel name" required />
+            <FormInput label="Delivery Address" id="checkout-address" value={details.address} onChange={e => { setDetails(p => ({ ...p, address: e.target.value })); setDetailsErrors({}); }} onBlur={handleAddressBlur} error={detailsErrors.address} placeholder="Room no / Block / Hostel name" required />
           )}
           <div className="flex gap-3 mt-6">
             <button onClick={() => setStep(0)} className="flex-1 py-3 border border-gray-200 text-secondary-gray rounded-xl font-semibold hover:bg-gray-50">Back</button>

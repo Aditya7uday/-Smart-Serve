@@ -55,7 +55,7 @@ export function AdminUsers() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {['Name', 'Email', 'Role', 'Status', 'Action'].map(h => (
+                  {['Name', 'Email', 'Role', 'Status'].map(h => (
                     <th key={h} className="px-4 py-3 text-left font-semibold text-secondary-gray">{h}</th>
                   ))}
                 </tr>
@@ -77,10 +77,10 @@ export function AdminUsers() {
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${user.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{user.active ? 'Active' : 'Inactive'}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <button onClick={() => toggleActive(user.id)}
+                      {/* <button onClick={() => toggleActive(user.id)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${user.active ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
                         {user.active ? <><UserX className="w-3.5 h-3.5" /> Deactivate</> : <><UserCheck className="w-3.5 h-3.5" /> Activate</>}
-                      </button>
+                      </button> */}
                     </td>
                   </tr>
                 ))}

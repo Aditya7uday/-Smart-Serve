@@ -32,3 +32,6 @@ backend/**/migrations/__pycache__
 backend/db.sqlite3
 backend/staticfiles
 *.pyc
+
+# Secrets - keep real values local only; configure them via the host's env var settings instead
+backend/.env

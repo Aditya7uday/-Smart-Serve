@@ -7,28 +7,27 @@ Quick start guide to run **Smart Serve** locally.
 ## 🚀 Commands to Run Localhost
 
 ### 1. Start Backend (Django API)
-Open Terminal 1 in the project root:
+Open Terminal 1, inside the **`backend/`** folder:
 
 **Windows (PowerShell / CMD):**
 ```cmd
-cd backend
-.\venv\Scripts\python manage.py runserver 8000
+.\venv\Scripts\python.exe manage.py runserver 8000
 ```
-*(Or activate first: `.\venv\Scripts\activate` in CMD / `.\venv\Scripts\Activate.ps1` in PowerShell)*
 
 **macOS / Linux:**
 ```bash
-cd backend
 source venv/bin/activate
 python manage.py runserver 8000
 ```
 
 ### 2. Start Frontend (React)
-Open Terminal 2 in the project root:
+Open Terminal 2, inside the **project root** folder:
 ```bash
-npm run dev
+npm.cmd run dev
 ```
-*(On Windows PowerShell, if script execution policy blocks `npm.ps1`, run `cmd /c "npm run dev"`)*
+*(On Windows PowerShell, if script execution policy blocks `npm.ps1`, use `npm.cmd run dev` as above, or run `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` once to allow plain `npm run dev`.)*
+
+> Start the backend first, then the frontend.
 
 ---
 

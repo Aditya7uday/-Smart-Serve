@@ -12,14 +12,27 @@ export function AdminInventory() {
   const [loading, setLoading] = useState(true);
   const [editItem, setEditItem] = useState(null);
   const [newStock, setNewStock] = useState('');
+  const [stockError, setStockError] = useState('');
   const { addToast } = useToast();
 
   useEffect(() => {
     adminService.getInventory().then(data => { setInventory(data); setLoading(false); });
   }, []);
 
+  const validateStock = (value) => {
+    const num = Number(value);
+    if (value.trim() === '' || Number.isNaN(num)) return 'Enter a stock quantity';
+    if (!Number.isInteger(num) || num < 0) return 'Stock must be a whole number, 0 or greater';
+    return '';
+  };
+
+  const handleStockBlur = () => setStockError(validateStock(newStock));
+
   const handleUpdate = async () => {
-    if (!editItem || newStock === '') return;
+    if (!editItem) return;
+    const err = validateStock(newStock);
+    if (err) { setStockError(err); return; }
+    setStockError('');
     try {
       const updated = await adminService.updateInventoryStock(editItem.id, Number(newStock));
       setInventory(prev => prev.map(i => i.id === updated.id ? updated : i));
@@ -59,7 +72,7 @@ export function AdminInventory() {
                   <td className="px-4 py-3 text-secondary-gray">{item.unit}</td>
                   <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
                   <td className="px-4 py-3">
-                    <button onClick={() => { setEditItem(item); setNewStock(String(item.currentStock)); }}
+                    <button onClick={() => { setEditItem(item); setNewStock(String(item.currentStock)); setStockError(''); }}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-secondary-gray hover:text-dark-text transition-colors">
                       <Pencil className="w-3 h-3" /> Update Stock
                     </button>
@@ -79,7 +92,7 @@ export function AdminInventory() {
               <div className="flex justify-between mt-1"><span className="text-secondary-gray">Minimum stock</span><span className="font-medium">{editItem.minStock} {editItem.unit}</span></div>
               <div className="flex justify-between mt-1"><span className="text-secondary-gray">Status</span><StatusBadge status={editItem.status} /></div>
             </div>
-            <FormInput label={`New Stock (${editItem.unit})`} id="new-stock" type="number" value={newStock} onChange={e => setNewStock(e.target.value)} required />
+            <FormInput label={`New Stock (${editItem.unit})`} id="new-stock" type="number" min="0" step="1" value={newStock} onChange={e => { setNewStock(e.target.value); setStockError(''); }} onBlur={handleStockBlur} error={stockError} required />
             <div className="flex gap-3">
               <button onClick={() => setEditItem(null)} className="flex-1 py-2.5 border border-gray-200 text-secondary-gray rounded-xl font-medium hover:bg-gray-50">Cancel</button>
               <button onClick={handleUpdate} className="flex-1 py-2.5 bg-primary-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-colors">Update</button>
